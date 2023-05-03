@@ -1,6 +1,7 @@
 import pyrealsense2 as rs
 import numpy as np
 import cv2
+import time
 
 # Configure depth and color streams
 pipeline = rs.pipeline()
@@ -30,14 +31,16 @@ else:
 
 # Start streaming
 pipeline.start(config)
-
+align_to = rs.stream.color
+align = rs.align(align_to)
 try:
     while True:
-
+        start = time.time()
         # Wait for a coherent pair of frames: depth and color
         frames = pipeline.wait_for_frames()
-        depth_frame = frames.get_depth_frame()
-        color_frame = frames.get_color_frame()
+        aligned_frames = align.process(frames)
+        depth_frame = aligned_frames.get_depth_frame()
+        color_frame = aligned_frames.get_color_frame()
         if not depth_frame or not color_frame:
             continue
 
@@ -61,7 +64,12 @@ try:
         # Show images
         cv2.namedWindow('RealSense', cv2.WINDOW_AUTOSIZE)
         cv2.imshow('RealSense', images)
-        cv2.waitKey(1)
+        if cv2.waitKey(1)==27:
+            break
+        #do some stuff
+        stop = time.time()
+        duration = stop-start
+        print(duration)
 
 finally:
 
