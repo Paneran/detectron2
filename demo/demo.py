@@ -9,6 +9,7 @@ import time
 import warnings
 import cv2
 import tqdm
+import pyrealsense2 as rs
 
 from detectron2.config import get_cfg
 from detectron2.data.detection_utils import read_image
@@ -46,6 +47,7 @@ def get_parser():
     )
     parser.add_argument("--webcam", action="store_true", help="Take inputs from webcam.")
     parser.add_argument("--video-input", help="Path to video file.")
+    parser.add_argument("--realsense", action="store_true", help="take input from realsense cam.")
     parser.add_argument(
         "--input",
         nargs="+",
@@ -144,6 +146,100 @@ if __name__ == "__main__":
                 break  # esc to quit
         cam.release()
         cv2.destroyAllWindows()
+
+    elif args.realsense:
+        assert args.input is None, "Cannot have both --input and --realsense!"
+        assert args.output is None, "output not yet supported with --webcam!"
+
+        pipeline = rs.pipeline()
+        config = rs.config()
+
+        # Get device product line for setting a supporting resolution
+        pipeline_wrapper = rs.pipeline_wrapper(pipeline)
+        pipeline_profile = config.resolve(pipeline_wrapper)
+        device = pipeline_profile.get_device()
+        device_product_line = str(device.get_info(rs.camera_info.product_line))
+
+        found_rgb = False
+        for s in device.sensors:
+            if s.get_info(rs.camera_info.name) == 'RGB Camera':
+                found_rgb = True
+                break
+        if not found_rgb:
+            print("The demo requires Depth camera with Color sensor")
+            exit(0)
+
+        config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
+
+        if device_product_line == 'L500':
+            config.enable_stream(rs.stream.color, 960, 540, rs.format.bgr8, 30)
+        else:
+            config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
+
+        # Start streaming
+        pipeline.start(config)
+        align_to = rs.stream.color
+        align = rs.align(align_to)
+        
+        # cam = cv2.VideoCapture(2)
+        # print(cv2.CAP_PROP_CHANNEL)
+        # for vis in tqdm.tqdm(demo.run_on_video(cam)):
+        #     # align frames-- color pixel values are the same, but depth rescaled
+        #     # try:
+        #     #     frames = pipeline.wait_for_frames()
+        #     #     aligned_frames = align.process(frames)
+        #     #     depth_frames = aligned_frames.get_depth_frame()
+        #     # except:
+        #     #     pass
+
+        #     # find centroid of object of interest-- ball
+        #     # naive approach: take the first instance of the object and 
+
+        #     cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
+        #     cv2.imshow(WINDOW_NAME, vis)
+        #     if cv2.waitKey(1) == 27:
+        #         break  # esc to quit
+        # cam.release()
+        # cv2.destroyAllWindows()
+
+        try:
+            while True:
+
+                # Wait for a coherent pair of frames: depth and color
+                frames = pipeline.wait_for_frames()
+                aligned_frames = align.process(frames)
+                depth_frame = aligned_frames.get_depth_frame()
+                color_frame = aligned_frames.get_color_frame()
+                if not depth_frame or not color_frame:
+                    continue
+
+                # Convert images to numpy arrays
+                depth_image = np.asanyarray(depth_frame.get_data())
+                color_image = np.asanyarray(color_frame.get_data())
+
+                # Apply colormap on depth image (image must be converted to 8-bit per pixel first)
+                depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
+
+                depth_colormap_dim = depth_colormap.shape
+                color_colormap_dim = color_image.shape
+
+                # If depth and color resolutions are different, resize color image to match depth image for display
+                if depth_colormap_dim != color_colormap_dim:
+                    resized_color_image = cv2.resize(color_image, dsize=(depth_colormap_dim[1], depth_colormap_dim[0]), interpolation=cv2.INTER_AREA)
+                    images = np.hstack((resized_color_image, depth_colormap))
+                else:
+                    images = np.hstack((color_image, depth_colormap))
+
+                # Show images
+                cv2.namedWindow('RealSense', cv2.WINDOW_AUTOSIZE)
+                cv2.imshow('RealSense', images)
+                cv2.waitKey(1)
+
+        finally:
+
+            # Stop streaming
+            pipeline.stop()
+
     elif args.video_input:
         video = cv2.VideoCapture(args.video_input)
         width = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
