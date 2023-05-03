@@ -177,10 +177,11 @@ if __name__ == "__main__":
                 # function to map mask to point -- takes centroid
                 mask = predictions.pred_masks[index].detach().numpy()
                 xis, yis = np.nonzero(mask)
-                cy = xis.mean()
-                cx = yis.mean()
+                cy = int(xis.mean())
+                cx = int(yis.mean())
+                print(depth_frame[cy, cx])
 
-                image = cv2.circle(color_frame, (int(cx), int(cy)), 5, color=(0, 0, 255), thickness=10)
+                image = cv2.circle(color_frame, (cx, cy), 5, color=(0, 0, 255), thickness=10)
             else:
                 image = color_frame
             # predictions.pred_classes.numpy()      -- gives key number for label
