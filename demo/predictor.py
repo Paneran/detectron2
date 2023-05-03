@@ -121,7 +121,7 @@ class VisualizationDemo(object):
                 depth_image = np.asanyarray(depth_frame.get_data())
                 color_image = np.asanyarray(color_frame.get_data())
 
-                yield depth_image, color_image
+                yield color_image, depth_image
 
                 if cv2.waitKey(1) == 27:
                     break
@@ -206,19 +206,19 @@ class VisualizationDemo(object):
                 )
             elif "instances" in predictions:
                 predictions = predictions["instances"].to(self.cpu_device)
-                vis_frame = video_visualizer.draw_instance_predictions(frame, predictions)
+                vis_frame = [video_visualizer.draw_instance_predictions(frame, predictions), [predictions]]
             elif "sem_seg" in predictions:
                 vis_frame = video_visualizer.draw_sem_seg(
                     frame, predictions["sem_seg"].argmax(dim=0).to(self.cpu_device)
                 )
 
             # Converts Matplotlib RGB format to OpenCV BGR format
-            vis_frame = cv2.cvtColor(vis_frame.get_image(), cv2.COLOR_RGB2BGR)
+            vis_frame[0] = cv2.cvtColor(vis_frame[0].get_image(), cv2.COLOR_RGB2BGR)
             return vis_frame
 
         frame_gen = self._align_frame_from_video()
         for frame in frame_gen:
-            yield process_predictions(frame[1], self.predictor(frame[1])), frame[0]
+            yield [process_predictions(frame[0], self.predictor(frame[0])), frame[1]]
 
 class AsyncPredictor:
     """

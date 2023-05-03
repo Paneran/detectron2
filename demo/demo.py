@@ -155,11 +155,41 @@ if __name__ == "__main__":
             # find centroid of object of interest-- ball
             # naive approach: take the first instance of the object and 
             # get depth frame
+            predictions = vis[0][1][0]
             depth_frame = vis[1]
+            color_frame = vis[0][0]
+            num_instances = len(predictions)
+
+            # find sports ball
+            index = 0
+            flag = 0
+            
+            for inst in predictions.pred_classes.numpy():
+                index = index + 1
+                if inst == 32:
+                    flag = 1
+                    print("ball found")
+                    break
+                    
+            index = index - 1
+
+            if flag:
+                # function to map mask to point -- takes centroid
+                mask = predictions.pred_masks[index].detach().numpy()
+                xis, yis = np.nonzero(mask)
+                cy = xis.mean()
+                cx = yis.mean()
+
+                image = cv2.circle(color_frame, (int(cx), int(cy)), 5, color=(0, 0, 255), thickness=10)
+            else:
+                image = color_frame
+            # predictions.pred_classes.numpy()      -- gives key number for label
+            # predictions.pred_masks                -- gives masks
+            # predictions.scores                    -- gives scores
             
 
             cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
-            cv2.imshow(WINDOW_NAME, vis[0])
+            cv2.imshow(WINDOW_NAME, image)
             if cv2.waitKey(1) == 27:
                 break  # esc to quit
         cv2.destroyAllWindows()
