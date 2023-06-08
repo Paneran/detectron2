@@ -166,7 +166,8 @@ if __name__ == "__main__":
             
             for inst in predictions.pred_classes.numpy():
                 index = index + 1
-                if inst == 32:
+                print(inst)
+                if inst == 32 or inst == 47:
                     flag = 1
                     print("ball found")
                     break
